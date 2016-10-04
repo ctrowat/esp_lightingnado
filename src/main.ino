@@ -26,6 +26,7 @@ int led_inset_length = 999;
 #include "Slide/Slide.hpp"
 #include "Twinkle/Twinkle.hpp"
 #include "Percent/Percent.hpp"
+#include "FilePlayback/fileplayback.hpp"
 LightMode *currentMode = NULL;
 char currentModeChar=' ';
 
@@ -349,6 +350,9 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
             break;
         case 'A':
             currentMode = new Ants(strip, modePayload);
+            break;
+        case 'F':
+            currentMode = new FilePlayback(strip, modePayload);
             break;
       }
 
