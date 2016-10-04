@@ -42,6 +42,11 @@ char node_name[20];
 char topic_status[50];
 char topic_control[50];
 
+ESP8266WebServer server(80);
+File UploadFile;
+String filename;
+
+
 /* ========================================================================================================
                                            __
                               ______ _____/  |_ __ ________
@@ -82,13 +87,64 @@ String readSetting(const char* key) {
   return output;
 }
 
+void handleUpload(){
+  if (server.uri() != "/test") return;
+    HTTPUpload& upload = server.upload();
+    if (upload.status == UPLOAD_FILE_START) {
+      filename = upload.filename;
+      Serial.print("Upload Name: "); Serial.println(filename);
+      UploadFile = SPIFFS.open("/data/" + filename, "w");
+    } else if (upload.status == UPLOAD_FILE_WRITE) {
+      if (UploadFile) {
+        UploadFile.write(upload.buf, upload.currentSize);
+        Serial.println(upload.totalSize);
+      }
+    } else if (upload.status == UPLOAD_FILE_END) {
+      if (UploadFile) {
+        Serial.print("Received ");
+        Serial.print(upload.totalSize);
+        Serial.println(" bytes");
+        UploadFile.close();
+      }
+    }
+}
+
 void setup() {
   randomSeed(analogRead(0));
 
   Serial.begin(115200);
 
   SPIFFS.begin();
-
+  FSInfo fs_info;
+  SPIFFS.info(fs_info);
+  Serial.print("total fs size: ");
+  Serial.println(fs_info.totalBytes);
+  Serial.print("used size: ");
+  Serial.println(fs_info.usedBytes);
+//  Serial.print("block size: ");
+//  Serial.println(fs_info.blockSize);
+//  Serial.print("page size: ");
+//  Serial.println(fs_info.pageSize);
+//  Serial.print("max open files: ");
+//  Serial.println(fs_info.maxOpenFiles);
+//  Serial.print("max path length: ");
+//  Serial.println(fs_info.maxPathLength);  
+  // clear upload firectory
+  Serial.println("Cleaning up data storage");
+  String str = "";
+  Dir dir = SPIFFS.openDir("/data/");
+  while (dir.next()) {
+    str = dir.fileName();
+    str += " (";
+    str += dir.fileSize();
+    str += ")";
+    if (SPIFFS.remove(dir.fileName())) {
+      Serial.print("Successfully removed: ");
+    } else {
+      Serial.print("Error removing file: ");
+    }
+    Serial.println(str);
+  }
   WiFiManager wifiManager;
 
   // short pause on startup to look for settings RESET
@@ -220,6 +276,13 @@ void setup() {
   // default mode?
   //currentMode = new Slide(strip, "{\"delay\": 100, \"length\": 5, \"right\": false, \"color\":[200,100,0]}");
   //currentModeChar = 'S';
+  server.on("/", [](){
+    server.send(200, "text/plain", "Hello World");
+  });
+  server.on("/test", HTTP_POST, []() { 
+    server.send(200, "text/plain", "Success");
+  }, handleUpload);
+  server.begin();
 }
 
 /* ========================================================================================================
@@ -345,6 +408,7 @@ void loop() {
   } else {
     delay(10);
   }
+  server.handleClient();
 
   time = millis();
   if (time - lastWifiCheck > 5000) {
